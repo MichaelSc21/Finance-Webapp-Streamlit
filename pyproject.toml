@@ -1,0 +1,21 @@
+[project]
+name = "finance-webapp"
+version = "2.0.0"
+description = "Finance Webapp to visualise your bank statements and transactions"
+authors = [
+  { name = "Michael" }
+]
+requires-python = ">=3.12"
+dependencies = [
+  "streamlit",
+  "pandas",
+  "plotly",
+  "numpy",
+  "chardet",
+  "openpyxl",
+  "uvicorn"
+]
+
+[build-system]
+requires = ["setuptools>=61.0"]
+build-backend = "setuptools.build_meta"
