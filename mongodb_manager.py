@@ -322,3 +322,24 @@ class MongoDBManager:
         collection = self.db[collection_name]
         result = collection.delete_many(query)
         return result.deleted_count 
+    
+
+    def get_or_create_user_from_google(
+        self,
+        email: str, 
+        name: str 
+    ) -> UserInDB:
+        
+        existing_user = self.users_collection.find_one({'email': email})
+        if existing_user:
+            return UserInDB(**existing_user)
+        
+        new_user = UserInDB(
+            username=name.replace(" ", "_"),
+            email=email,
+            password=b'',
+            extra_data={'provided': 'google'}
+        )
+        print("it has created a document for the google user")
+        self.users_collection.insert_one(new_user.model_dump())
+        return new_user

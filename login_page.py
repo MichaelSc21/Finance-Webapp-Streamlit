@@ -1,8 +1,10 @@
 import streamlit as st
+from streamlit_oauth import OAuth2Component
 import jwt
 import os
 from datetime import datetime, timedelta
 from functools import wraps
+import base64
 
 # Static typing
 from typing import Optional, Dict, Any
@@ -13,6 +15,11 @@ from mongodb_manager import JWTAuthManager, MongoDBManager
 
 auth_manager = JWTAuthManager(os.getenv("JWT_SECRET_KEY"))
 db_manager = MongoDBManager(os.getenv("MONGODB_URI"), "Streamlit_app")
+
+# Google OAuth Configuration
+GOOGLE_CLIENT_ID = os.getenv("GOOGLE_CLIENT_ID")
+GOOGLE_CLIENT_SECRET = os.getenv("GOOGLE_CLIENT_SECRET")
+REDIRECT_URI = "http://localhost:8501"  # Change for production
 
 
 def login_required(func):
@@ -61,9 +68,101 @@ def login_page() -> None:
     
     with login_tab:
         render_login_form()
+
+        # Add Google Login Button
+        st.divider()
+        st.markdown("Or")
+        st.subheader("Sign in with Google")
+
+        # You should ideally load these from environment variables
+        oauth2 = OAuth2Component(
+            client_id=os.environ["GOOGLE_CLIENT_ID"],
+            client_secret=os.environ["GOOGLE_CLIENT_SECRET"],
+            authorize_endpoint="https://accounts.google.com/o/oauth2/v2/auth",
+            token_endpoint="https://oauth2.googleapis.com/token",
+            refresh_token_endpoint="https://oauth2.googleapis.com/token",
+            revoke_token_endpoint="https://oauth2.googleapis.com/revoke"
+        )
+
+        redirect_uri = os.environ["GOOGLE_REDIRECT_URI"]
+        scope = "openid email profile"
+
+        result = oauth2.authorize_button(
+            name="Continue with Google",
+            redirect_uri=redirect_uri,
+            scope=scope,
+            icon=None,
+            use_container_width=True,
+            key="google-login",
+            pkce="S256",
+            extras_params={"prompt": "consent", "access_type": "offline"}
+        )
+        print("authorize_button result:", result, type(result))
+
+        if result and "token" in result:
+            decoded_id_token = jwt.decode(result['token']['id_token'], 
+                options={"verify_signature": False})
+            result['id_token'] = decoded_id_token
+
+            st.session_state.decoded_id_token = decoded_id_token
+            st.session_state.token = result["token"]
+            st.session_state.user = "google_user"  # You can parse more from result['id_token'] if needed
+            st.success("Google login successful!")
+            google_login_flow()
+
     
     with register_tab:
         render_register_form()
+
+
+def render_google_login_button() -> None:
+    """Renders the Google login button"""
+    google_login = st.button("Login with Google")
+    
+    if google_login:
+        google_login_flow()
+
+
+def google_login_flow() -> None:
+    """Handles the Google login process"""
+
+    # If the user is not logged in but the id_token is present from OAuth flow
+    if "token" in st.session_state and "user_info" not in st.session_state:
+        try:
+            # Decode ID token to get user info (already stored during OAuth flow)
+            id_token = st.session_state.decoded_id_token
+
+            user_info = {
+                "email": id_token["email"],
+                "name": id_token.get("name", id_token["email"].split("@")[0]),
+            }
+
+            # Save user info to session
+            st.session_state.user_info = user_info
+
+            # Persist to database
+            print(f"[DEBUG] Creating or getting user: {user_info['email']}")
+            user = db_manager.get_or_create_user_from_google(user_info["email"], user_info["name"])
+            st.session_state.user = user.username
+
+            # Create JWT
+            token = auth_manager.create_token(user.username)
+            st.session_state.token = token
+
+            st.success("Login successful!")
+              # Now it's safe to rerun since everything is stored
+
+        except Exception as e:
+            st.error(f"Login failed: {e}")
+            st.stop()
+
+    # If the user is fully logged in
+    elif "user_info" in st.session_state:
+        user_info = st.session_state.user_info
+        st.write(f"Logged in as: {user_info['name']} ({user_info['email']})")
+
+    else:
+        st.info("Please log in using Google.")
 
 
 def render_login_form() -> None:
