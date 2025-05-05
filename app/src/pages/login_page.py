@@ -8,10 +8,12 @@ import base64
 
 # Static typing
 from typing import Optional, Dict, Any
-from models import UserCreate, UserInDB, TokenData
+from src.login.models import UserCreate, UserInDB, TokenData
+
+from src.login.mongodb_manager import JWTAuthManager, MongoDBManager
 
 
-from mongodb_manager import JWTAuthManager, MongoDBManager
+
 
 auth_manager = JWTAuthManager(os.getenv("JWT_SECRET_KEY"))
 db_manager = MongoDBManager(os.getenv("MONGODB_URI"), "Streamlit_app")

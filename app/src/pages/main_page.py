@@ -1,17 +1,9 @@
 import streamlit as st
 import pandas as pd
 import plotly.express as px
+import plotly.graph_objects as go
 import json
 import os
-
-st.set_page_config(page_title="Simple Finance App", page_icon="💰", layout="wide")
-
-login_page = st.Page("login_page.py", title="Login Page" )
-main_page = st.Page("main_page.py", title="Main Dashboard")
-
-
-pg = st.navigation([login_page, main_page])
-pg.run()
 
 
 
@@ -85,7 +77,9 @@ def main():
     st.title("Simple Finance Dashboard")
     
     uploaded_file = st.file_uploader("Upload your transaction CSV file", type=["xlsx"])
-    
+    st.session_state.uploaded_file_bool = True
+
+
     if uploaded_file is not None:
         df = load_transactions(uploaded_file)
         
@@ -95,7 +89,7 @@ def main():
             
             st.session_state.debits_df = debits_df.copy()
             
-            tab1, tab2 = st.tabs(["Expenses (Debits)", "Payments (Credits)"])
+            tab1, tab2, tab3 = st.tabs(["Expenses (Debits)", "Payments (Credits)", "Expenses over time"])
             with tab1:
                 new_category = st.text_input("New Category Name")
                 add_button = st.button("Add Category")
@@ -221,10 +215,14 @@ def main():
 
                 st.plotly_chart(fig, use_container_width=True, theme="streamlit")
 
+                st.session_state.credits_df = credits_df 
+                print(list(st.session_state.keys()))
+
             with tab2:
                 st.subheader("Payments Summary")
                 total_payments = credits_df["Amount"].sum()
                 st.metric("Total Payments", f"{total_payments:,.2f} GBP")
                 st.write(credits_df)
-        
+
+
 main()

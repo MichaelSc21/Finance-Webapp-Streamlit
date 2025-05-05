@@ -11,7 +11,7 @@ import os
 from functools import wraps
 
 # For static typing
-from models import UserBase, UserCreate, UserInDB, TokenData
+from .models import UserBase, UserCreate, UserInDB, TokenData
 from typing import Optional, Dict, Any, List, Union
 from pydantic import BaseModel, Field, SecretStr
 
