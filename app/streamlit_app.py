@@ -5,6 +5,9 @@ import json
 import os
 
 
+
+
+
 st.set_page_config(page_title="Simple Finance App", page_icon="💰", layout="wide")
 
 login_page = st.Page("src/pages/login_page.py", title="Login Page" )

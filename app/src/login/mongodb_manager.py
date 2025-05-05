@@ -343,3 +343,131 @@ class MongoDBManager:
         print("it has created a document for the google user")
         self.users_collection.insert_one(new_user.model_dump())
         return new_user
+    
+
+    # Adding categories to DB
+    def get_user_categories(
+        self, 
+        username: str
+        ) -> Dict[str, List[str]]:
+        """
+        Get a user's transaction categories
+        
+        Args:
+            username: Username to lookup
+            
+        Returns:
+            Dictionary of categories with their keywords
+            Defaults to {"Uncategorised": []} if no categories exist
+        """
+        result = self.db['categories'].find_one({'username': username})
+        if not result:
+            return {"Uncategorised": []}
+        return result['categories']
+
+
+    def save_user_categories(
+        self, 
+        username: str, 
+        categories: Dict[str, List[str]]
+        ) -> bool:
+        """
+        Save a user's transaction categories
+        
+        Args:
+            username: Username to save for
+            categories: Dictionary of categories with their keywords
+            
+        Returns:
+            True if operation was successful
+        """
+        try:
+            self.db['categories'].update_one(
+                {'username': username},
+                {'$set': {'categories': categories}},
+                upsert=True
+            )
+            return True
+        except PyMongoError as e:
+            st.error(f"Error saving categories: {str(e)}")
+            return False
+
+    def add_category_keyword(
+        self, 
+        username: str, 
+        category: str, 
+        keyword: str
+        ) -> bool:
+        """
+        Add a keyword to a category
+        
+        Args:
+            username: Username to update
+            category: Category to add to
+            keyword: Keyword to add
+            
+        Returns:
+            True if keyword was added successfully
+        """
+        keyword = keyword.strip()
+        if not keyword:
+            return False
+            
+        try:
+            # If the user already has a categories field, it adds the keyword to that corresponding category
+            result = self.db['categories'].update_one(
+                {'username': username, f"categories.{category}": {'$exists': True}},
+                {'$addToSet': {f"categories.{category}": keyword}}
+            )
+            
+            # If there is no categories field, it creates the categories field and adds the keyword to it
+            if result.matched_count == 0:
+                # Category doesn't exist, create it
+                self.db['categories'].update_one(
+                    {'username': username},
+                    {'$set': {f"categories.{category}": [keyword]}},
+                    upsert=True
+                )
+                
+            return True
+        except PyMongoError as e:
+            st.error(f"Error adding keyword: {str(e)}")
+            return False
+        
+
+    def display_user_info(self, username: str) -> str:
+        """
+        Returns a string representation of a user's data for debugging/display purposes.
+        
+        Args:
+            username: The username to look up
+            
+        Returns:
+            A formatted string with user information
+        """
+        user_data = self.users_collection.find_one({'username': username})
+        
+        if not user_data:
+            return f"No user found with username: {username}"
+        
+        try:
+            # Create a safe copy without sensitive data
+            display_data = {
+                'username': user_data.get('username'),
+                'email': user_data.get('email'),
+                'created_at': user_data.get('created_at'),
+                'updated_at': user_data.get('updated_at'),
+                'categories': user_data.get('categories')  # Check if categories exist
+            }
+            
+            # Format the output string
+            output = [f"User: {display_data['username']}"]
+            output.append(f"Email: {display_data['email']}")
+            output.append(f"Created: {display_data['created_at']}")
+            output.append(f"Updated: {display_data['updated_at']}")
+            output.append(f"Has categories: {display_data['categories']}")
+            
+            return "\n".join(output)
+            
+        except Exception as e:
+            return f"Error formatting user data: {str(e)}"
