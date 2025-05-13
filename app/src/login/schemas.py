@@ -1,8 +1,7 @@
-from typing import Dict, List, Optional
+from typing import Dict, List, Optional, Any
 from pydantic import BaseModel, Field, validator
 from datetime import datetime
-from pydantic.types import SecretStr
-import re
+
 
 class UserBase(BaseModel):
     """Base user model with common fields"""
@@ -10,25 +9,18 @@ class UserBase(BaseModel):
         ...,
         min_length=3,
         max_length=50,
-        regex="^[a-zA-Z0-9_]+$",
+        pattern="^[a-zA-Z0-9_]+$",
         description="Username must be alphanumeric with underscores"
     )
     email: Optional[str] = Field(
         None,
-        regex=r"^[^@\s]+@[^@\s]+\.[^@\s]+$",
+        pattern=r"^[^@\s]+@[^@\s]+\.[^@\s]+$",
         description="Must be a valid email address"
     )
     created_at: datetime = Field(default_factory=datetime.utcnow)
     updated_at: datetime = Field(default_factory=datetime.utcnow)
 
 
-class UserCreate(UserBase):
-    """Model for creating new users with password"""
-    password: SecretStr = Field(
-        ...,
-        min_length=8,
-        description="Password must be at least 8 characters long"
-    )
 
 class UserCategories(BaseModel):
     """Model for user transaction categories"""
@@ -50,15 +42,17 @@ class UserCategories(BaseModel):
                     raise ValueError("All keywords must be strings")
         return v
 
+
+# This model is not needed as the password is no longer stored in the database
 class UserInDB(UserBase, UserCategories):
     """Complete user model for database storage"""
-    password: bytes = Field(..., description="Hashed password")
     extra_data: Optional[Dict[str, Any]] = Field(
         None,
         description="Additional user metadata"
     )
 
 
+# Delete this in the future if it is not being used
 class UserResponse(UserBase, UserCategories):
     """Model for returning user data (without sensitive info)"""
     pass
@@ -66,7 +60,8 @@ class UserResponse(UserBase, UserCategories):
 
 class TokenData(BaseModel):
     """Model for JWT token payload"""
-    username: str
+    sub: str
+    email: str
     exp: datetime
     iat: datetime
 
@@ -96,13 +91,6 @@ class KeywordOperation(BaseModel):
             raise ValueError("Keyword cannot be empty")
         return v.strip()
 
-
-class UserWithCategories(UserBase):
-    """Extended user model with categories"""
-    categories: Dict[str, List[str]] = Field(
-        default_factory=lambda: {"Uncategorised": []},
-        description="User's transaction categories"
-    )
 
 
 class DatabaseStatus(BaseModel):

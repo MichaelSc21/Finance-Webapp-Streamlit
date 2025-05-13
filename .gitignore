@@ -5,3 +5,5 @@ account-statement_2023-10-20_2025-04-21.xlsx
 .venv
 .env
 *.pyc
+*.log
+*.txt

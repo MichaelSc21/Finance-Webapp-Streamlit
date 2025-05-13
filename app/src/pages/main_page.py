@@ -5,50 +5,32 @@ import plotly.graph_objects as go
 import json
 import os
 from src.login import auth_manager, db_manager
-
+from src.logger import logger
 
 
 category_file = "app/src/pages/categories.json"
 
-if "categories" not in st.session_state:
-    
-    if 'username' in st.session_state:
-        # Load user's categories from the DB
-        st.session_state.categories = db_manager.get_user_categories(st.session_state.username)
-        print(st.session_state.categories)
-    else:
-        st.session_state.categories = {"Uncategorised": [],}
+
+if 'user' in st.session_state:
+    # Load user's categories from the DB
+    st.session_state.categories = db_manager.get_user_categories(st.session_state.user['google_id'])
+    logger.info("Saved the categories field to st.session_state")
+else:
+    st.session_state.categories = {"Uncategorised": []}
 
 
-print("\n\n\n\n")
-print(os.path.exists(category_file))
-print(os.getcwd())
-
-if os.path.exists(category_file):
-    with open(category_file, "r") as f:
-        st.session_state.categories = json.load(f)
         
 def save_categories():
-    #with open(category_file, "w") as f:
-    #   json.dump(st.session_state.categories, f)
-
-    if "username" in st.session_state:
-        db_manager.save_user_categories(st.session_state.username, st.session_state.categories)
-        print(st.session_state.categories)
-        print("\n\n\n\n")
+    if "user" in st.session_state:
+        db_manager.save_user_categories(st.session_state.user['google_id'], st.session_state.categories)
+        logger.info("Saved user categories to DB")
 
 
 def categorise_transactions(df):
     """Categorise transactions using the current category mapping"""
-    df["Category"] = "Uncategorised"
-    
-
     # Iterating through the categories and keywords, and mapping categories found in the mapping to the associated keywords, on the df
-    """
-    Example:
-    
-    
-    """
+
+    df["Category"] = "Uncategorised"
     for category, keywords in st.session_state.categories.items():
         if category == "Uncategorised" or not keywords:
             continue
@@ -59,7 +41,8 @@ def categorise_transactions(df):
             description = row["Description"].lower().strip()
             if description in lowered_keywords:
                 df.at[idx, "Category"] = category
-                
+
+    logger.info("Categorised transactions on the st.session_state.df")
     return df  
 
 type_to_debit_credit = {
@@ -78,9 +61,8 @@ def load_transactions(file):
         df = pd.read_excel(file)
         # Changing columns from object type to string
         df = df.astype({col: str for col in df.select_dtypes(include='object').columns})
-        print("read the file")
+        print("read the excel file")
         df.columns = [col.strip() for col in df.columns]
-        #df["Amount"] = df["Amount"].str.replace(",", "").astype(float)
         df["Credit/Debit"] = df["Type"].map(type_to_debit_credit)
         #df["Completed Date"] = pd.to_datetime(df["Completed Date"], format="%d %b %Y") 
         
@@ -102,9 +84,9 @@ def add_keyword_to_category(category, keyword):
             st.session_state.categories[category] = []
         st.session_state.categories[category].append(keyword)
 
-        if 'username' in st.session_state:
+        if 'user' in st.session_state:
             db_manager.add_category_keyword(
-                st.session_state.username,
+                st.session_state.user['google_id'],
                 category,
                 keyword
             )
@@ -116,8 +98,8 @@ def main():
     st.title("Simple Finance Dashboard")
     
 
-    if 'username' in st.session_state:
-        st.sidebar.success(f"Logged in as: {st.session_state.username}")
+    if 'user' in st.session_state:
+        st.sidebar.success(f"Logged in as: {st.session_state.user['name']}")
     else:
         st.sidebar.warning("Not logged in - categories won't be saved 🙃")
 
@@ -138,7 +120,6 @@ def main():
 
             with tab1:
                 # Category management section
-
                 col1, col2 = st.columns(2)
                 with col1:
                     new_category = st.text_input("New Category Name")
@@ -154,10 +135,9 @@ def main():
                 
 
                 st.subheader("Your Expenses")
-
-                
                 # Filters
                 col1, col2, col3 = st.columns(3)
+
 
                 # Filtering date ranges
                 with col1:
@@ -275,7 +255,6 @@ def main():
                 st.plotly_chart(fig, use_container_width=True, theme="streamlit")
 
                 st.session_state.credits_df = credits_df 
-                print(list(st.session_state.keys()))
 
             with tab2:
                 st.subheader("Payments Summary")
