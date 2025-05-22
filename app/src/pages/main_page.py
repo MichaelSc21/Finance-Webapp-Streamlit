@@ -7,6 +7,10 @@ import os
 from src.login import auth_manager, db_manager
 from src.logger import logger
 
+# LLM Categorisation
+from src.utils.llm_api import recategorise_transactions, ammend_transaction_categories 
+
+
 
 category_file = "app/src/pages/categories.json"
 
@@ -116,7 +120,7 @@ def main():
             
             st.session_state.debits_df = debits_df.copy()
             
-            tab1, tab2, tab3 = st.tabs(["Expenses (Debits)", "Payments (Credits)", "Expenses over time"])
+            tab1, tab2, tab3 = st.tabs(["Expenses (Debits)", "Payments (Credits)", "AI Categorisation"])
 
             with tab1:
                 # Category management section
@@ -262,5 +266,33 @@ def main():
                 st.metric("Total Payments", f"{total_payments:,.2f} GBP")
                 st.write(credits_df)
 
+            with tab3:
 
+                user_habits = st.text_input("Enter your habits to create more accurate categories for transactions")
+
+                ai_categorisation_button = st.button("Create the categories and keywords with AI")
+                if ai_categorisation_button:
+
+    
+                    #TODO: Change this to either merge with st.session_state.credits_df and debits_df or just save df to st.session_state
+                    transaction_descriptions = df['Description'].unique()
+                    new_category_keywords = recategorise_transactions(transaction_descriptions=transaction_descriptions, habits=user_habits)
+                    
+                    # This function only saves categories to DB but doesn't save them to session_state
+                    #TODO: Either get rid of this function or add a line to save categories to st.session_state
+                    db_manager.save_user_categories(st.session_state.user['google_id'], new_category_keywords)
+                    st.session_state.categories = new_category_keywords
+
+
+                ammend_category_keyword_button = st.button("Ammend the classification made by the LLM")
+
+                if ammend_category_keyword_button:
+                    new_category_keywords = ammend_transaction_categories(category_keyword_json=st.session_state.categories, habits=user_habits)
+                    logger.ingo
+                    db_manager.save_user_categories(st.session_state.user['google_id'], new_category_keywords)
+                    st.session_state.categories = new_category_keywords
+
+
+                if ammend_category_keyword_button or ai_categorisation_button:
+                    st.write(json.dumps(st.session_state.categories, indent=4, sort_keys=True))
 main()

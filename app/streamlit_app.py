@@ -15,8 +15,6 @@ main_page = st.Page("src/pages/main_page.py", title="Main Dashboard")
 waterfall_page = st.Page("src/pages/waterfall.py", title="Waterfall Chart") 
 session_state_page = st.Page("src/pages/show_session_state.py", title="Show Session State")
 
-print(waterfall_page)
-
 
 pg = st.navigation([login_page, main_page, waterfall_page, session_state_page])
 pg.run()
